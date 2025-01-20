@@ -1,0 +1,4 @@
+# List your required libraries here 
+# python-pptx
+streamlit
+pandas
