@@ -8,6 +8,7 @@ import numpy as np
 
 PREFIX = st.secrets["prefix"]   # EUXP
 
+
 # Configure the main page
 st.set_page_config(
     page_title="월간 보고서 생성기",
@@ -100,8 +101,7 @@ if uploaded_file is not None:
     )
 
     selected_columns['링크'] = selected_columns['이슈키'].apply(
-        # lambda x: make_url_encoded_link('https://jira.skbroadband.com/browse/' + x, x)
-        lambda x: f"https://jira.skbroadband.com/browse/{x}"
+        lambda x: f"{st.secrets['jira_url']}/browse/{x}"
     )    
 
     # 시작일의 데이터를 기반으로 '일자' 컬럼 추가
