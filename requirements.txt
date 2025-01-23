@@ -1,4 +1,4 @@
 # List your required libraries here 
-# python-pptx
+python-pptx
 streamlit
 pandas

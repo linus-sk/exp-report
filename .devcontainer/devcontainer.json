@@ -17,6 +17,7 @@
 	// "dockerComposeFile": "../docker-compose.yml",
 	// "service": "app",
 	// "workspaceFolder": "/workspace/app",
+	"runArgs": ["--env-file",".devcontainer/devcontainer.env"],
 	"postCreateCommand": "bash .devcontainer/post-create.sh",
 	"remoteUser": "vscode",
 	"customizations": {

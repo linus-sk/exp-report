@@ -116,3 +116,26 @@ def run_presentation(
     ppt_buffer.seek(0)
 
     return ppt_buffer
+
+def make_presentation() -> None:
+    """
+    Main function to generate a presentation from data.
+
+    Returns:
+    - None. Saves the generated presentation as 'output.pptx'.
+    """
+
+    # Load the presentation template
+    path = "assets/presentation-template.pptx"  
+    presentation = read_presentation(path) 
+
+    # TODO: Add logic to populate the presentation with data 
+
+
+    ppt_buffer = BytesIO()
+    presentation.save(ppt_buffer)
+    ppt_buffer.seek(0)
+
+    return ppt_buffer
+
+    return ppt_buffer
