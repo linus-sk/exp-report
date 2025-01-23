@@ -1,10 +1,14 @@
 from datetime import datetime, timedelta
 import streamlit as st
+from streamlit.components.v1 import html
 import pandas as pd
 from core.utilities import make_report_query, dropdown_menus, make_monthly_report_query, make_weekly_report_query, get_korean_weekday, make_url_encoded
 from core.data import request_data_from_api, load_data
 from core.presentation import make_presentation
 import numpy as np
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 
 # Configure the main page
@@ -34,8 +38,25 @@ selected_system, selected_report = dropdown_menus(
 
 if st.button("보고서 생성"):
     jql = make_report_query(selected_system, selected_report)
+
+    # Print jql to the terminal
+    logging.info(f"JQL: {jql}")
+
+    # Print jql to the browser console
+    # st.write(f"<script>console.log('JQL: {jql}');</script>", unsafe_allow_html=True)
+    html_code = f"""
+    <script>
+        console.log("SYSTEM: {selected_system}");
+        console.log("REPORT: {selected_report}");
+        console.log({jql!r});
+    </script>
+    """
+    html(html_code)
+    # st.javascript(f"console.log('JQL: {jql}');")
+
     mode = st.secrets["mode"]
     if mode == "test":
+        logging.info("Loading test data...")
         issues = load_data("data/test_data_24_12_euxp.json")
     else:
         issues = request_data_from_api(
