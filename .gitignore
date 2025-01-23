@@ -176,5 +176,6 @@ cython_debug/
 
 .streamlit/
 secrets.toml
+data/
 
 .DS_Store

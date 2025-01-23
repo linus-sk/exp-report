@@ -1,11 +1,12 @@
-import logging
 import numpy as np
 import pandas as pd
 from typing import Union, List
 import requests
+from datetime import datetime
+import os
 import streamlit as st
 from core.utilities import get_korean_weekday
-
+import json
 
 def filter_data(
     data: pd.DataFrame, company_name: str, year: str
@@ -49,7 +50,7 @@ def prepare_chart_data(data: pd.DataFrame, company_name: str, year:str) -> dict:
 
 
 def request_data_from_api(
-    api_url: str, api_key: str, jql: str
+    api_url: str, api_key: str, jql: str, selected_system: str
 ) -> Union[pd.DataFrame, None]:
     """
     Requests data from an API.
@@ -78,14 +79,62 @@ def request_data_from_api(
     if response.status_code == 200:
         # Parse the response as JSON
         data = response.json()
-        logging.info(f"Data received: {data}")
 
-        # Convert the JSON data to a Pandas DataFrame
-        return pd.DataFrame(data.get("issues", []))
+        if st.secrets['save_data']:
+            # Save the JSON data to a file
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            file_path = os.path.join("data", f"{selected_system}_{timestamp}.json")
+            with open(file_path, 'w') as file:
+                json.dump(data, file, ensure_ascii=False, indent=4)
+
+        return extract_issues(data)
 
     # Return None if the request was unsuccessful
     return None
 
+
+def extract_issues(data: dict) -> pd.DataFrame:
+    """
+    Extracts issues from the given data and returns a DataFrame.
+
+    Parameters:
+    - data: The data containing issues.
+
+    Returns:
+    - A DataFrame containing the extracted issues.
+    """
+    issues = data.get('issues', [])
+
+    # Extract specific fields
+    extracted_data = []
+    for issue in issues:
+        extracted_data.append({
+            '이슈키': issue.get('key'),
+            '요약': issue.get('fields', {}).get('summary'),
+            '종료일': issue.get('fields', {}).get('customfield_10135'),
+            '시작일': issue.get('fields', {}).get('customfield_10134'),
+            '레이블': issue.get('fields', {}).get('labels'),
+            '비고': None,   
+            '담당자': None,
+        })
+    
+    issues_df = pd.DataFrame(extracted_data)
+    issues_df['이슈'] = issues_df['이슈키'] + ' ' + issues_df['요약']
+    issues_df['시작일'] = pd.to_datetime(issues_df['시작일'], errors='coerce')
+    issues_df['종료일'] = pd.to_datetime(issues_df['종료일'], errors='coerce')
+
+    issues_df['M/D'] = issues_df.apply(
+        lambda row: np.busday_count(row['시작일'].date(), row['종료일'].date()), axis=1
+    )
+
+    # M/D 값에 1을 추가
+    issues_df['M/D'] = issues_df['M/D'] + 1
+
+    issues_df['링크'] = issues_df['이슈키'].apply(
+        lambda x: f"{st.secrets['jira_url']}/browse/{x}"
+    )
+
+    return issues_df
 
 def load_data(file_path: str) -> pd.DataFrame:
     """
@@ -93,42 +142,11 @@ def load_data(file_path: str) -> pd.DataFrame:
 
     Parameters:
     - file_path: The path to the file to load.
-    """
 
+    Returns:
+    - A DataFrame containing the loaded data.
+    """
     with open(file_path, 'r') as file:
         data = pd.read_json(file)
-        issues = data.get('issues', [])
-
-        # Extract specific fields
-        extracted_data = []
-        for issue in issues:
-            extracted_data.append({
-                '이슈키': issue.get('key'),
-                '요약': issue.get('fields', {}).get('summary'),
-                '종료일': issue.get('fields', {}).get('customfield_10135'),
-                '시작일': issue.get('fields', {}).get('customfield_10134'),
-                '레이블': issue.get('fields', {}).get('labels'),
-                '비고': None,   
-                '담당자': None,
-            })
-        
-        issues_df = pd.DataFrame(extracted_data)
-        issues_df['이슈'] = issues_df['이슈키'] + ' ' + issues_df['요약']
-        issues_df['시작일'] = pd.to_datetime(issues_df['시작일'], errors='coerce')
-        issues_df['종료일'] = pd.to_datetime(issues_df['종료일'], errors='coerce')
-
-        issues_df['M/D'] = issues_df.apply(
-            lambda row: np.busday_count(row['시작일'].date(), row['종료일'].date()), axis=1
-        )
-
-        # M/D 값에 1을 추가
-        issues_df['M/D'] = issues_df['M/D'] + 1
-
-        issues_df['링크'] = issues_df['이슈키'].apply(
-            lambda x: f"{st.secrets['jira_url']}/browse/{x}"
-        )    
-
-        # 시작일의 데이터를 기반으로 '일자' 컬럼 추가
-        # selected_columns['일자'] = selected_columns['시작일'].dt.strftime('%m/%d (%a)')
-        issues_df['일자'] = issues_df['시작일'].apply(lambda x: x.strftime('%m/%d') + f" ({get_korean_weekday(x)})")
-    return issues_df
+    
+    return extract_issues(data)

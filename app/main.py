@@ -35,13 +35,14 @@ selected_system, selected_report = dropdown_menus(
 if st.button("보고서 생성"):
     jql = make_report_query(selected_system, selected_report)
     mode = st.secrets["mode"]
-    if mode == "dev":
+    if mode == "test":
         issues = load_data("data/test_data_24_12_euxp.json")
     else:
         issues = request_data_from_api(
             st.secrets["jira_url"] + "/rest/api/2/search",
             st.secrets["jira_token"],
-            jql
+            jql,
+            selected_system
         )
 
     today = datetime.now()
