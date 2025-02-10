@@ -115,7 +115,7 @@ def run_presentation(
     presentation.save(ppt_buffer)
     ppt_buffer.seek(0)
 
-    return ∏
+    return ppt_buffer
 
 def make_presentation() -> None:
     """
