@@ -115,7 +115,7 @@ def run_presentation(
     presentation.save(ppt_buffer)
     ppt_buffer.seek(0)
 
-    return ppt_buffer
+    return ∏
 
 def make_presentation() -> None:
     """
@@ -135,6 +135,8 @@ def make_presentation() -> None:
     ppt_buffer = BytesIO()
     presentation.save(ppt_buffer)
     ppt_buffer.seek(0)
+
+    
 
     return ppt_buffer
 

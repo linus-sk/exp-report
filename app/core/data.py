@@ -92,6 +92,21 @@ def request_data_from_api(
     # Return None if the request was unsuccessful
     return None
 
+def load_data(file_path: str) -> pd.DataFrame:
+    """
+    Loads data from a file.
+
+    Parameters:
+    - file_path: The path to the file to load.
+
+    Returns:
+    - A DataFrame containing the loaded data.
+    """
+    with open(file_path, 'r') as file:
+        data = pd.read_json(file)
+    
+    return extract_issues(data)
+
 
 def extract_issues(data: dict) -> pd.DataFrame:
     """
@@ -108,13 +123,22 @@ def extract_issues(data: dict) -> pd.DataFrame:
     # Extract specific fields
     extracted_data = []
     for issue in issues:
+        # Extract inward issue links
+        child_issues = []
+        for link in issue.get('fields', {}).get('issuelinks', []):
+            if 'inwardIssue' in link:
+                child_issues.append(f"{link['inwardIssue']['key']} {link['inwardIssue']['fields']['summary']}")
+            if 'outwardIssue' in link:
+                child_issues.append(f"{link['outwardIssue']['key']} {link['outwardIssue']['fields']['summary']}")
+
         extracted_data.append({
             '이슈키': issue.get('key'),
             '요약': issue.get('fields', {}).get('summary'),
             '종료일': issue.get('fields', {}).get('customfield_10135'),
             '시작일': issue.get('fields', {}).get('customfield_10134'),
             '레이블': issue.get('fields', {}).get('labels'),
-            '비고': None,   
+            '차일드': child_issues,
+            '비고': None,
             '담당자': None,
         })
     
@@ -124,11 +148,12 @@ def extract_issues(data: dict) -> pd.DataFrame:
     issues_df['종료일'] = pd.to_datetime(issues_df['종료일'], errors='coerce')
 
     issues_df['M/D'] = issues_df.apply(
-        lambda row: np.busday_count(row['시작일'].date(), row['종료일'].date()), axis=1
+        lambda row: np.busday_count(row['시작일'].date(), row['종료일'].date()) if pd.notna(row['시작일']) and pd.notna(row['종료일']) else None, axis=1
     )
 
-    # M/D 값에 1을 추가
-    issues_df['M/D'] = issues_df['M/D'] + 1
+    # M/D 값에 1을 추가 (None이 아닌 경우에만)
+    issues_df['M/D'] = issues_df['M/D'].apply(lambda x: x + 1 if x is not None else None)
+
 
     issues_df['링크'] = issues_df['이슈키'].apply(
         lambda x: f"{st.secrets['jira_url']}/browse/{x}"
@@ -136,17 +161,4 @@ def extract_issues(data: dict) -> pd.DataFrame:
 
     return issues_df
 
-def load_data(file_path: str) -> pd.DataFrame:
-    """
-    Loads data from a file.
 
-    Parameters:
-    - file_path: The path to the file to load.
-
-    Returns:
-    - A DataFrame containing the loaded data.
-    """
-    with open(file_path, 'r') as file:
-        data = pd.read_json(file)
-    
-    return extract_issues(data)

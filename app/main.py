@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 import streamlit as st
 from streamlit.components.v1 import html
 import pandas as pd
-from core.utilities import make_report_query, dropdown_menus, make_monthly_report_query, make_weekly_report_query, get_korean_weekday, make_url_encoded
+from tabulate import tabulate
+from core.utilities import make_report_query, dropdown_menus, refine_issues, get_korean_weekday
 from core.data import request_data_from_api, load_data
 from core.presentation import make_presentation
 import numpy as np
@@ -28,7 +29,7 @@ st.write(
 
 selected_system, selected_report = dropdown_menus(
     system_label="시스템 선택",
-    system_options=["EUXP"],
+    system_options=["EUXP", "NCMS"],
     report_label="레포트 선택",
     report_options=["Weekly", "Monthly"],
     default_system="EUXP",
@@ -56,8 +57,9 @@ if st.button("보고서 생성"):
 
     mode = st.secrets["mode"]
     if mode == "test":
-        logging.info("Loading test data...")
-        issues = load_data("data/test_data_24_12_euxp.json")
+        test_data = st.secrets["test_data"]
+        logging.info(f"Loading test data...{test_data}")
+        issues = load_data(f"data/{test_data}")
     else:
         issues = request_data_from_api(
             st.secrets["jira_url"] + "/rest/api/2/search",
@@ -66,28 +68,7 @@ if st.button("보고서 생성"):
             selected_system
         )
 
-    today = datetime.now()
-
-    # Set baseline_day based on selected_report
-    if selected_report == "Weekly":
-        baseline_day = today - timedelta(days=today.weekday())  # This week's first day (Monday)
-    elif selected_report == "Monthly":
-        baseline_day = today.replace(day=1)  # This month's first day
-
-    # 상태 컬럼 추가
-    issues['상태'] = issues['종료일'].apply(
-        lambda x: '진행중' if pd.isna(x) or x >= baseline_day else '완료'
-    )
-
-    # Convert 레이블 values
-    issues['레이블'] = issues['레이블'].apply(
-        lambda labels: [
-            label.replace(f"{selected_system}_", "")
-                .replace(f"{selected_system}", "")
-            for label in labels
-        ]
-    )
-    issues['레이블'] = issues['레이블'].apply(lambda labels: ''.join(labels))
+    issues = refine_issues(issues, selected_system, selected_report)
 
 
     excel_columns = issues.filter(regex='이슈|비고|상태|M/D|담당자')
@@ -127,6 +108,25 @@ if st.button("보고서 생성"):
     # st.table(label_counts)
     st.dataframe(label_counts.reset_index(drop=True), hide_index = True)
 
+    st.write("2. 사전 검증(BMT) 현황:")
+    bmt_issues = issues[issues['BMT'] == True]    
+    bmt_issues = bmt_issues[['시스템', '일자', '차일드']]
+    bmt_issues = bmt_issues.rename(columns={'시스템': '구분', '차일드': '설명'})
+    bmt_issues['설명'] = bmt_issues['설명'].apply(lambda x: '\n'.join(x))
+
+    st.dataframe(bmt_issues.reset_index(drop=True), hide_index=True)
+
+    st.write("3. 변경 관리 현황: 상용 배포")
+    pm_issues = issues[issues['PM'] == True]    
+    pm_issues = pm_issues[['시스템', '일자', '차일드']]
+    pm_issues = pm_issues.rename(columns={'시스템': '구분', '차일드': '설명'})
+    pm_issues['설명'] = pm_issues['설명'].apply(lambda x: '\n'.join(x))
+
+    # st.dataframe(pm_issues.reset_index(drop=True), hide_index=True)
+    # st.table(pm_issues.reset_index(drop=True))
+    st.markdown(tabulate(pm_issues, headers='keys', tablefmt='pipe'), unsafe_allow_html=True)
+
+
 
     # 태그값이 '운영개발'인 항목만 필터링
     operation_development = issues.query("레이블 == '운영개발'")
@@ -138,6 +138,8 @@ if st.button("보고서 생성"):
 
     ppt_buffer = make_presentation(
     )
+
+    today = datetime.now()
 
     st.download_button(
         label="파워포인트 다운로드",
