@@ -36,6 +36,11 @@ selected_system, selected_report = dropdown_menus(
     default_report="Weekly",
 )
 
+st.sidebar.markdown(f"[이슈 생성하기]({st.secrets['jira_url']}/secure/CreateIssue!default.jspa)")
+
+if selected_report == "Monthly":
+    st.markdown("'<span style='color:red'>월간 일일점검 체크리스트</span>' 일감은 생성하셨나요?", unsafe_allow_html=True)
+
 
 if st.button("보고서 생성"):
     jql = make_report_query(selected_system, selected_report)
